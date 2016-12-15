@@ -38,7 +38,7 @@ int copy_file_in_directory(char *, char *);
 int mkdir_recurs(char *, mode_t);
 int copy_file_to_file(char *, char *);
 int copy_file_in_directory(char *, char *);
-short zipping = 0; //zip flag
+short zipping = 0; //zip flag (0 - nozip, 1 - zip)
 
 int main (int argc, char** argv) {
 	
@@ -287,7 +287,9 @@ int copy_directory(char* first_dir, char* second_dir) {
 		if (stat_res == 0) {
             char out_dirent_path_zipped[PATH_MAX] = "\0";
             strcat(out_dirent_path_zipped, out_dirent_path);
-            strcat(out_dirent_path_zipped, ".gz\0");
+            if (zipping == 1) {
+				strcat(out_dirent_path_zipped, ".gz\0");
+			}
 			stat(out_dirent_path_zipped, &stat_out);
 			if (stat_out.st_mtime >= stat_in.st_mtime) {
                 printf("File '%s' is already backuped\n", in_dirent_path);
