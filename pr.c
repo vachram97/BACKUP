@@ -28,15 +28,11 @@
 //#define PATH_MAX 4096  ---->in linux/limits.h
 //#define NAME_MAX 255   ---->in linux/limits.h
 
-int copy_files(char*, char*);
+int copy_files(const char*, const char*);
 int copy_data(int, int);
-int zip_file(char*);
-int comp_dirents(const void*, const void*);
-int copy_directory(char*, char*);
-int copy_file_in_directory(char *, char *);
-int mkdir_recurs(char *, mode_t);
-int copy_file_to_file(char *, char *);
-int copy_file_in_directory(char *, char *);
+int zip_file(const char*);
+int copy_directory(const char*, const char*);
+int mkdir_recurs(const char *, mode_t);
 int zipping = 0; //zip flag (0 - nozip, 1 - zip)
 
 int main(int argc, char** argv) {
@@ -109,7 +105,7 @@ int main(int argc, char** argv) {
 
 //copies files, if directories for new file are created before
 //returns 0 on success
-int copy_files(char* source, char* destination) {
+int copy_files(const char* source, const char* destination) {
 	printf("Copying %s\n", source);
 	int fd_in, fd_out; //file descriptors
 	//opening for reading
@@ -177,7 +173,7 @@ int copy_data(int fd_in, int fd_out) {
 
 //function archivate file, returns result of 'gzip' or -1 on error
 //while creating new process, 0 on success
-int zip_file(char *file) {
+int zip_file(const char *file) {
 	printf("Zipping %s\n", file);
 	pid_t zip_pid = fork();
 	int stat_zip;
@@ -196,7 +192,7 @@ int zip_file(char *file) {
 
 //copies directory with its files from first_dir to second_dir
 //returns 0 on success
-int copy_directory(char* first_dir, char* second_dir) {
+int copy_directory(const char* first_dir, const char* second_dir) {
 	//opening directories
 	DIR* input_d;
 	DIR* output_d;
@@ -317,7 +313,7 @@ int copy_directory(char* first_dir, char* second_dir) {
 
 //creates a directory, if one directories of path doesn't exist, creates it
 //return -1 on fail, 0 otherwise
-int mkdir_recurs(char *dir_path, mode_t mode) {
+int mkdir_recurs(const char *dir_path, mode_t mode) {
 	umask(0);
 	if (0 == mkdir(dir_path, mode)) {
 		return 0;
