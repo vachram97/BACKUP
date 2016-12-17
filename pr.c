@@ -41,45 +41,42 @@ int zipping = 0; //zip flag (0 - nozip, 1 - zip)
 
 int main(int argc, char** argv) {
 
-	if ((argc == 2)
-			&& ((strcmp(argv[1], "-h") == 0)
-					|| (strcmp(argv[1], "--help\0") == 0))) {
-		printf("This program is aimed to copy files or directories."
-				" It can copy only file to file or directory to directory,"
-				" in dependence on the first argument. If second argument"
-				" doesn't exists, its type (reg_file or dir) will be equal"
-				" to the type of the first argument\n\n"
-				"Usage: command [-g] source destination.\n"
-				"Keys:\n"
-				"\t-g -- zipping all files\n");
-		return 0;
-	}
-
-	int source_num; //number of arg, where source path is located
-
-	if (argc == 4) {
-		if (strcmp(argv[1], "-g") == 0) {
+	int opt;
+	while (-1 != (opt = getopt(argc, argv, "hg"))) {
+		if (opt == '?') {
+			printf ("Usage: %s source destination\n", argv[0]);
+			return -1;
+		}
+		if ((opt == 'h') && (argc == 2)) {
+			printf("This program is aimed to copy files or directories."
+							" It can copy only file to file or directory to directory,"
+							" in dependence on the first argument. If second argument"
+							" doesn't exists, its type (reg_file or dir) will be equal"
+							" to the type of the first argument\n\n"
+							"Usage: command [-g] source destination.\n"
+							"Keys:\n"
+							"\t-g -- zipping all files\n");
+			return 0;
+		}
+		if ((opt == 'g') && (argc == 4)) {
 			zipping = 1;
-			source_num = 2;
-		} else {
-			printf("Usage: %s [-g] source destination\n", argv[0]);
-			return 1;
+			continue;
 		}
-	} else {
-		if (argc != 3) {
-			printf("Usage: %s [-g] source destination\n", argv[0]);
-			return 1;
-		}
-		source_num = 1;
+		printf ("Usage: %s source  destination\n", argv[0]);
+		return -1;
 	}
+	 if (argc != optind + 2) {
+		 printf ("Usage: %s source destination\n", argv[0]);
+		 return -1;
+	 }
 
 	//trying to understand what is given for copying
 	struct stat stat_in, stat_out;
-	if (-1 == stat(argv[source_num], &stat_in)) {
+	if (-1 == stat(argv[optind], &stat_in)) {
 		perror("Problem with first arg");
 		return 0;
 	}
-	if (-1 == stat(argv[source_num + 1], &stat_out)) {
+	if (-1 == stat(argv[optind], &stat_out)) {
 		if (errno == ENOENT) {
 			//if second file/dir doesn't exist, we assume that their type are equal to type of the first arg
 			stat_out.st_mode = stat_in.st_mode;
@@ -90,11 +87,11 @@ int main(int argc, char** argv) {
 	}
 	int stat;
 	if ((S_ISREG(stat_in.st_mode)) && (S_ISREG(stat_out.st_mode))) {
-		stat = copy_files(argv[source_num], argv[source_num + 1]);
+		stat = copy_files(argv[optind], argv[optind + 1]);
 		return stat;
 	}
 	if ((S_ISDIR(stat_in.st_mode)) && (S_ISDIR(stat_out.st_mode))) {
-		stat = copy_directory(argv[source_num], argv[source_num + 1]);
+		stat = copy_directory(argv[optind], argv[optind + 1]);
 		return stat;
 	}
 	if ((S_ISDIR(stat_in.st_mode)) && (S_ISREG(stat_out.st_mode))) {
@@ -285,6 +282,7 @@ int copy_directory(char* first_dir, char* second_dir) {
 		}
 		if (curr_dirent->d_type == DT_REG) {
 			if (stat_res == 0) {
+				char out_dirent_path_zipped[PATH_MAX];
 				strcpy(out_dirent_path_zipped, out_dirent_path);
 				if (zipping == 1) {
 					strcat(out_dirent_path_zipped, ".gz");
