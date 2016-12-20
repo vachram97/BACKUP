@@ -24,7 +24,7 @@
 #include <errno.h>
 #include <limits.h>
 
-#define BUF_SIZE 65536
+#define BUF_SIZE 8192
 //#define PATH_MAX 4096  ---->in linux/limits.h
 //#define NAME_MAX 255   ---->in linux/limits.h
 
@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
 			printf ("Usage: %s source destination\n", argv[0]);
 			return -1;
 		}
+		//help option
 		if ((opt == 'h') && (argc == 2)) {
 			printf("This program is aimed to copy files or directories."
 							" It can copy only file to file or directory to directory,"
@@ -54,6 +55,7 @@ int main(int argc, char** argv) {
 							"\t-g -- zipping all files\n");
 			return 0;
 		}
+		//enable zipping
 		if ((opt == 'g') && (argc == 4)) {
 			zipping = 1;
 			continue;
@@ -61,10 +63,12 @@ int main(int argc, char** argv) {
 		printf ("Usage: %s source  destination\n", argv[0]);
 		return -1;
 	}
-	 if (argc != optind + 2) {
-		 printf ("Usage: %s source destination\n", argv[0]);
-		 return -1;
-	 }
+	
+	//checking number of arg
+	if (argc != optind + 2) {
+		printf ("Usage: %s source destination\n", argv[0]);
+		return -1;
+	}
 
 	//trying to understand what is given for copying
 	struct stat stat_in, stat_out;
@@ -72,6 +76,7 @@ int main(int argc, char** argv) {
 		perror("Problem with first arg");
 		return 0;
 	}
+	
 	if (-1 == stat(argv[optind], &stat_out)) {
 		if (errno == ENOENT) {
 			//if second file/dir doesn't exist, we assume that their type are equal to type of the first arg
@@ -81,19 +86,27 @@ int main(int argc, char** argv) {
 			return 0;
 		}
 	}
+	
 	int stat;
+	
+	//file and file
 	if ((S_ISREG(stat_in.st_mode)) && (S_ISREG(stat_out.st_mode))) {
 		stat = copy_files(argv[optind], argv[optind + 1]);
 		return stat;
 	}
+	
+	//dir and dir
 	if ((S_ISDIR(stat_in.st_mode)) && (S_ISDIR(stat_out.st_mode))) {
 		stat = copy_directory(argv[optind], argv[optind + 1]);
 		return stat;
 	}
+	
+	//dir and file
 	if ((S_ISDIR(stat_in.st_mode)) && (S_ISREG(stat_out.st_mode))) {
 		printf("I suppose it is not a good idea to copy directory in file\n");
 		return -1;
 	}
+	
 	/*if ((S_ISREG(stat_in.st_mode)) && (S_ISDIR(stat_out.st_mode))) {
 	 stat = copy_file_in_directory(argv[1], argv[2]);
 	 return stat;
@@ -233,32 +246,36 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 	while (NULL != (curr_dirent = readdir(input_d))) {
 		if ((strcmp(curr_dirent->d_name, ".") == 0)
 				|| (strcmp(curr_dirent->d_name, "..")) == 0)
-			continue; //to avoid some mistakes
+			continue; //to avoid some mistakes (like directories . and ..
 
 		//creating next pair of paths
-		strcpy(in_dirent_path, first_dir);
-		strcat(in_dirent_path, "/");
-		strcat(in_dirent_path, (curr_dirent)->d_name);
-		strcpy(out_dirent_path, second_dir);
-		strcat(out_dirent_path, "/");
-		strcat(out_dirent_path, (curr_dirent)->d_name);
+		sprintf(in_dirent_path, "%s/%s", first_dir, curr_dirent->d_name);
+		sprintf(out_dirent_path, "%s/%s", second_dir, curr_dirent->d_name);
+		
 		struct stat stat_in, stat_out;
 		stat(in_dirent_path, &stat_in);
+		
+		//checking zipflag to look for zipped entries in directories
 		if ((zipping == 1) && (!S_ISDIR(stat_in.st_mode)))
 			strcat(out_dirent_path, ".gz\0");
 
+		//looking for already backuped file
 		if (-1 == (stat_res = stat(out_dirent_path, &stat_out))) {
 			if (errno != ENOENT) {
 				perror("failed get stats");
 				continue;
 			}
 		}
+		
+		//making full path of second entry
 		strcpy(out_dirent_path, second_dir);
 		strcat(out_dirent_path, "/");
 		strcat(out_dirent_path, (curr_dirent)->d_name);
 
 		//copying current element
+		//if directory
 		if (curr_dirent->d_type == DT_DIR) {
+			
 			if (stat_res == 0) {
 				if (-1 == copy_directory(in_dirent_path, out_dirent_path)) {
 					fprintf(stderr, "Error copying '%s' to '%s'\n",
@@ -266,6 +283,7 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 				}
 				continue;
 			} else {
+				//no dir found, create it and continue copying
 				umask(0);
 				printf("Creating directory '%s'\n", out_dirent_path);
 				mkdir(out_dirent_path, stat_in.st_mode & 0777);
@@ -276,14 +294,18 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 				continue;
 			}
 		}
+		//if regular file 
 		if (curr_dirent->d_type == DT_REG) {
 			if (stat_res == 0) {
+				//checking for zipping flag
 				char out_dirent_path_zipped[PATH_MAX];
 				strcpy(out_dirent_path_zipped, out_dirent_path);
 				if (zipping == 1) {
 					strcat(out_dirent_path_zipped, ".gz");
 				}
 				stat(out_dirent_path_zipped, &stat_out);
+				
+				//compare time in order to not doing extra work
 				if (stat_out.st_mtime >= stat_in.st_mtime) {
 					printf("File '%s' is already backuped\n", in_dirent_path);
 					continue;
@@ -291,12 +313,14 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 				printf("File '%s' has been modified, making a new backup...\n",
 						in_dirent_path);
 				remove(out_dirent_path_zipped);
+				
 				if (0 != copy_files(in_dirent_path, out_dirent_path)) {
 					fprintf(stderr, "Error copying '%s' to '%s'\n", in_dirent_path,
 							out_dirent_path);
 				}
 				continue;
 			} else {
+				//if no file entry found, we'll copy it
 				if (0 != copy_files(in_dirent_path, out_dirent_path)) {
 					fprintf(stderr, "Error copying '%s' to '%s'\n", in_dirent_path,
 							out_dirent_path);
