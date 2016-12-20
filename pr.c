@@ -28,6 +28,10 @@
 //#define PATH_MAX 4096  ---->in linux/limits.h
 //#define NAME_MAX 255   ---->in linux/limits.h
 
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
 int copy_files(const char*, const char*);
 int copy_data(int, int);
 int zip_file(const char*);
@@ -216,7 +220,10 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 	}
 
 	struct stat dir_stats;
-	stat(first_dir, &dir_stats);
+	if (-1 == stat(first_dir, &dir_stats)) {
+		printf("Error while gettings stats of '%s': %s\n", first_dir, strerror(errno));
+		return -1;
+	}
 	//create all directories to open head directory
 	if (NULL == (output_d = opendir(second_dir))) {
 		if (errno == ENOENT) {
@@ -249,8 +256,14 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 			continue; //to avoid some mistakes (like directories . and ..
 
 		//creating next pair of paths
-		sprintf(in_dirent_path, "%s/%s", first_dir, curr_dirent->d_name);
-		sprintf(out_dirent_path, "%s/%s", second_dir, curr_dirent->d_name);
+		if (snprintf(in_dirent_path, PATH_MAX, "%s/%s", first_dir, curr_dirent->d_name) > PATH_MAX - 1) {
+			printf("Too long path: ignored\n");
+			continue;
+		}
+		if (snprintf(out_dirent_path, PATH_MAX, "%s/%s", second_dir, curr_dirent->d_name) > PATH_MAX - 1) {
+			printf("Too long path: ignored\n");
+			continue;
+		}
 		
 		struct stat stat_in, stat_out;
 		stat(in_dirent_path, &stat_in);
@@ -262,7 +275,8 @@ int copy_directory(const char* first_dir, const char* second_dir) {
 		//looking for already backuped file
 		if (-1 == (stat_res = stat(out_dirent_path, &stat_out))) {
 			if (errno != ENOENT) {
-				perror("failed get stats");
+				fprintf(stderr, "Error copying '%s' to '%s': %s\n",
+							in_dirent_path, out_dirent_path, strerror(errno));
 				continue;
 			}
 		}
